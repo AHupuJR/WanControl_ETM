@@ -68,31 +68,42 @@ def load_model_from_single_file(state_dict, model_names, control_layers, model_c
         else:
             model_state_dict, extra_kwargs = state_dict_results, {}
         torch_dtype = torch.float32 if extra_kwargs.get("upcast_to_float32", False) else torch_dtype
-        with init_weights_on_device():
-            model = model_class(control_layers, **extra_kwargs) # dit init
-        if hasattr(model, "eval"):
-            model = model.eval()
-        model.load_state_dict(model_state_dict, assign=True, strict=False) # turn off 'strict' for control block
-        # Control Blocks
-        model_control_state_dict = {}
-        for key, value in model_state_dict.items():
-            if 'blocks' in key:
-                block_number = int(key.split('.')[1])
-                if block_number < control_layers:
-                    # DIT Blocks
-                    new_key = key.replace('blocks', 'control_blocks', 1)
-                    model_control_state_dict[new_key] = value
-                    # ZeroLinear
-                    linear_key = f'control_blocks.{block_number}.zero_linear.weight'
-                    model_control_state_dict[linear_key] = torch.zeros(model.control_blocks[block_number].zero_linear.weight.shape, dtype=value.dtype, device=value.device)
 
-        model.load_state_dict(model_control_state_dict, assign=True, strict=False) # turn off 'strict' for control block
+        print('[model_class]', model_class)
+
+        if model_names == ['wan_video_dit']:
+            with init_weights_on_device():
+                model = model_class(control_layers, **extra_kwargs) # dit init
+            if hasattr(model, "eval"):
+                model = model.eval()
+            model.load_state_dict(model_state_dict, assign=True, strict=False) # turn off 'strict' for control block
+            # Control Blocks
+            model_control_state_dict = {}
+            for key, value in model_state_dict.items():
+                if 'blocks' in key:
+                    block_number = int(key.split('.')[1])
+                    if block_number < control_layers:
+                        # DIT Blocks
+                        new_key = key.replace('blocks', 'control_blocks', 1)
+                        model_control_state_dict[new_key] = value
+                        # ZeroLinear
+                        linear_key = f'control_blocks.{block_number}.zero_linear.weight'
+                        model_control_state_dict[linear_key] = torch.zeros(model.control_blocks[block_number].zero_linear.weight.shape, dtype=value.dtype, device=value.device)
+
+            model.load_state_dict(model_control_state_dict, assign=True, strict=False) # turn off 'strict' for control block
+        else:
+            with init_weights_on_device():
+                model = model_class(**extra_kwargs)
+            if hasattr(model, "eval"):
+                model = model.eval()
+            print('text encoder')
+            model.load_state_dict(model_state_dict, assign=True)
+    
         model = model.to(dtype=torch_dtype, device=device)
 
         loaded_model_names.append(model_name)
         loaded_models.append(model)
     return loaded_model_names, loaded_models
-
 
 def load_model_from_huggingface_folder(file_path, model_names, model_classes, torch_dtype, device):
     loaded_model_names, loaded_models = [], []
