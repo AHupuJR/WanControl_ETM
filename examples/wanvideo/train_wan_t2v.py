@@ -121,13 +121,13 @@ class TextVideoDataset(torch.utils.data.Dataset):
 
 
 class LightningModelForDataProcess(pl.LightningModule):
-    def __init__(self, text_encoder_path, vae_path, image_encoder_path=None, tiled=False, tile_size=(34, 34), tile_stride=(18, 16)):
+    def __init__(self, text_encoder_path, vae_path, image_encoder_path=None, tiled=False, tile_size=(34, 34), tile_stride=(18, 16), control_layers=15):
         super().__init__()
         model_path = [text_encoder_path, vae_path]
         if image_encoder_path is not None:
             model_path.append(image_encoder_path)
         model_manager = ModelManager(torch_dtype=torch.bfloat16, device="cpu")
-        model_manager.load_models(model_path)
+        model_manager.load_models(model_path, control_layers)
         self.pipe = WanVideoPipeline.from_model_manager(model_manager)
 
         self.tiler_kwargs = {"tiled": tiled, "tile_size": tile_size, "tile_stride": tile_stride}
@@ -598,6 +598,7 @@ def data_process(args):
         tiled=args.tiled,
         tile_size=(args.tile_size_height, args.tile_size_width),
         tile_stride=(args.tile_stride_height, args.tile_stride_width),
+        control_layers=args.control_layers,
     )
     trainer = pl.Trainer(
         accelerator="gpu",
