@@ -18,7 +18,6 @@ class TextVideoDataset(torch.utils.data.Dataset):
         self.path = [os.path.join(base_path, "train", file_name) for file_name in metadata["file_name"]]
         self.path_c = [os.path.join(base_path, "train", file_name) for file_name in metadata["control_name"]]
         self.text = metadata["text"].to_list()
-        
         self.max_num_frames = max_num_frames
         self.frame_interval = frame_interval
         self.num_frames = num_frames
@@ -47,9 +46,19 @@ class TextVideoDataset(torch.utils.data.Dataset):
 
     def load_frames_using_imageio(self, file_path, max_num_frames, start_frame_id, interval, num_frames, frame_process):
         reader = imageio.get_reader(file_path)
-        if reader.count_frames() < max_num_frames or reader.count_frames() - 1 < start_frame_id + (num_frames - 1) * interval:
+        total_frames = reader.count_frames()
+        required_frame_id = start_frame_id + (num_frames - 1) * interval
+
+        if total_frames < max_num_frames:
             reader.close()
-            return None
+            raise ValueError(
+                f"Video '{file_path}' has only {total_frames} frames, which is less than the required max_num_frames={max_num_frames}."
+            )
+        if total_frames - 1 < required_frame_id:
+            reader.close()
+            raise ValueError(
+                f"Video '{file_path}' does not have enough frames: required frame index {required_frame_id}, but only {total_frames} frames available."
+            )
         
         frames = []
         first_frame = None
@@ -112,6 +121,8 @@ class TextVideoDataset(torch.utils.data.Dataset):
             data = {"text": text, "video": video, "video_c": video_c, "path": path, "path_c": path_c, "first_frame": first_frame}
         else:
             data = {"text": text, "video": video, "video_c": video_c, "path": path, "path_c": path_c}
+        print(f'DEBUG: path:{path}, path_c:{path_c}')
+        print(f'DEBUG: video.shape:{video.shape}, video_c.shape:{video_c.shape}')
         return data
     
 
